@@ -10,7 +10,7 @@ var Tuneful = function() {
     this.playButton.click(this.onPlayButtonClicked.bind(this));
     this.playing = false;
 
-    // When a song is click to load it call the onSongClicked function
+    // When a song is clicked to load it call the onSongClicked function
     $("#songs").on("click", ".song",
                    this.onSongClicked.bind(this));
     // When the add song button is clicked call the onAddButtonClicked function
