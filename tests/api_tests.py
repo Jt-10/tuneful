@@ -54,22 +54,46 @@ class TestAPI(unittest.TestCase):
     def test_get_all_songs(self):
         """ Test GET songs from populated database """
         # Add test songs to database
-        songA = database.Song.files(name="Example Song A")
-        songB = database.Song.files(name="Example Song B")
+        songA = database.Song()
+        songB = database.Song()
+        songA.name = "Example Song A"
+        songB.name = "Example Song B"
+
         session.add_all([songA, songB])
         session.commit()
 
+        # Ensure endpoint exists and is returning JSON
         response = self.client.get("api/songs", headers=[("Accept", "application/json")])
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "application/json")
 
+        # Ensure songs database contains two entries
         data = json.loads(response.data.decode("ascii"))
         self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], {'file': {'id': 1, 'name': 'Example Song A'}, 'id': 1})
+        self.assertEqual(data[1], {'file': {'id': 2, 'name': 'Example Song B'}, 'id': 2})
 
-        songA = data[0]
-        self.assertEqual(songA["name"], "Example Song A")
 
-        songB = data[1]
-        self.assertEqual(songB["name"], "Example Song B")
+    def test_post_song(self):
+        """ Test POST song to the database"""
+        # Post a song to the database
+        data = {
+            "file": {
+            "id": 1
+            }
+        }
 
+        response = self.client.post("api/songs",
+                    data = json.dumps(data),
+                    content_type="application/json",
+                    headers=[("Accept", "application/json")]
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.mimetype, "applicationl/json")
+        self.assertEqual(urlparse(response.headers.get("Location")).path, "api/songs")
+
+        data = json.loads(response.decode("ascii"))
+        self.assertEqual(data["file"], "Sample File")
+        self.assertEqual(data["id"], 7)
