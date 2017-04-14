@@ -2,6 +2,7 @@ import unittest
 import os
 import shutil
 import json
+from io import BytesIO
 
 try: from urllib.parse import urlparse
 except ImportError: from urlparse import urlparse # Py2 compatibility
@@ -64,7 +65,7 @@ class TestAPI(unittest.TestCase):
         session.commit()
 
         # Ensure endpoint exists and is returning JSON
-        response = self.client.get("api/songs", headers=[("Accept", "application/json")])
+        response = self.client.get("/api/songs", headers=[("Accept", "application/json")])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "application/json")
 
@@ -86,7 +87,7 @@ class TestAPI(unittest.TestCase):
         # Post a song to the database
         data = {'file': {'id': fileA.id}}
 
-        response = self.client.post('api/songs',
+        response = self.client.post('/api/songs',
                     data = json.dumps(data),
                     content_type='application/json',
                     headers=[('Accept', 'application/json')]
@@ -100,26 +101,36 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(data['file']['name'], 'love_song.mp3')
         self.assertEqual(data['file']['id'], fileA.id)
 
-    def test_put_song(self):
-        """Test PUTting a song to the database"""
-        # Add test files to 'files' table
-        fileA = models.File(filename='love_song.mp3')
-        fileB = models.File(filename='another_song.mp3')
-        session.add_all([fileA, fileB])
-        session.commit()
+    def test_get_uploaded_files(self):
+        path = upload_path('test.txt')
+        with open(path, 'wb') as f:
+            f.write(b'File contents')
 
-        # Put a song to the database
-        data = {'file': {'id': fileA.id}}
+        response = self.client.get('/uploads/test.txt')
 
-        response = self.client.put('api/songs',
-                    data = json.dumps(data),
-                    content_type='application/json',
-                    headers=[('Accept', 'application/json')]
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, 'text/plain')
+        self.assertEqual(response.data, b'File contents')
+
+    def test_file_upload(self):
+        data = {
+            'file': (BytesIO(b'File contents'), 'test.txt')
+        }
+
+        response = self.client.post('/api/files',
+                data=data,
+                content_type='multipart/form-data',
+                headers=[('Accept', 'application/json')]
         )
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.mimetype, 'application/json')
 
         data = json.loads(response.data.decode('ascii'))
-        self.assertEqual(data['file']['name'], 'love_song.mp3')
-        self.assertEqual(data['file']['id'], fileA.id)
+        self.assertEqual(urlparse(data['path']).path, '/uploads/test.txt')
+
+        path = upload_path('test.txt')
+        self.assertTrue(os.path.isfile(path))
+        with open(path, 'rb') as f:
+            contents = f.read()
+        self.assertEqual(contents, b'File contents')

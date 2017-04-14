@@ -31,6 +31,7 @@ class File(Base):
         return {
             'id': self.id,
             'name': self.filename,
+            'path': url_for('uploaded_file', filename=self.filename)
         }
 
 Base.metadata.create_all(engine)
