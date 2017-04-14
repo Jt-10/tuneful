@@ -13,7 +13,7 @@ import sys; print(list(sys.modules.keys()))
 os.environ["CONFIG_PATH"] = "tuneful.config.TestingConfig"
 
 from tuneful import app
-from tuneful import database
+from tuneful import models
 from tuneful.utils import upload_path
 from tuneful.database import Base, engine, session
 
@@ -48,52 +48,78 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(response.mimetype, "application/json")
 
         # Ensure songs database is empty
-        data = json.loads(response.data.decode("ascii"))
+        data = json.loads(response.data.decode('ascii'))
         self.assertEqual(data, [])
 
-    def test_get_all_songs(self):
+    def test_get_songs(self):
         """ Test GET songs from populated database """
-        # Add test songs to database
-        songA = database.Song()
-        songB = database.Song()
-        songA.name = "Example Song A"
-        songB.name = "Example Song B"
+        # Add test files and songs to database
+        fileA = models.File(filename='love_song.mp3')
+        fileB = models.File(filename='another_song.mp3')
+        session.add_all([fileA, fileB])
 
+        songA = models.Song(files=fileA)
+        songB = models.Song(files=fileB)
         session.add_all([songA, songB])
         session.commit()
 
         # Ensure endpoint exists and is returning JSON
         response = self.client.get("api/songs", headers=[("Accept", "application/json")])
-
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "application/json")
 
-        # Ensure songs database contains two entries
-        data = json.loads(response.data.decode("ascii"))
+        # Ensure 'songs' table contains two entries related to those in the 'files' table
+        data = json.loads(response.data.decode('ascii'))
         self.assertEqual(len(data), 2)
-        self.assertEqual(data[0], {'file': {'id': 1, 'name': 'Example Song A'}, 'id': 1})
-        self.assertEqual(data[1], {'file': {'id': 2, 'name': 'Example Song B'}, 'id': 2})
+        self.assertEqual(data[0]['file']['id'], fileA.id)
+        self.assertEqual(data[1]['file']['id'], fileB.id)
 
 
     def test_post_song(self):
-        """ Test POST song to the database"""
-        # Post a song to the database
-        data = {
-            "file": {
-            "id": 1
-            }
-        }
+        """ Test POSTing a song to the database"""
+        # Add test files to 'files' table
+        fileA = models.File(filename='love_song.mp3')
+        fileB = models.File(filename='another_song.mp3')
+        session.add_all([fileA, fileB])
+        session.commit()
 
-        response = self.client.post("api/songs",
+        # Post a song to the database
+        data = {'file': {'id': fileA.id}}
+
+        response = self.client.post('api/songs',
                     data = json.dumps(data),
-                    content_type="application/json",
-                    headers=[("Accept", "application/json")]
+                    content_type='application/json',
+                    headers=[('Accept', 'application/json')]
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.mimetype, "applicationl/json")
-        self.assertEqual(urlparse(response.headers.get("Location")).path, "api/songs")
+        self.assertEqual(response.mimetype, 'application/json')
 
-        data = json.loads(response.decode("ascii"))
-        self.assertEqual(data["file"], "Sample File")
-        self.assertEqual(data["id"], 7)
+
+        data = json.loads(response.data.decode('ascii'))
+        self.assertEqual(data['file']['name'], 'love_song.mp3')
+        self.assertEqual(data['file']['id'], fileA.id)
+
+    def test_put_song(self):
+        """Test PUTting a song to the database"""
+        # Add test files to 'files' table
+        fileA = models.File(filename='love_song.mp3')
+        fileB = models.File(filename='another_song.mp3')
+        session.add_all([fileA, fileB])
+        session.commit()
+
+        # Put a song to the database
+        data = {'file': {'id': fileA.id}}
+
+        response = self.client.put('api/songs',
+                    data = json.dumps(data),
+                    content_type='application/json',
+                    headers=[('Accept', 'application/json')]
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.mimetype, 'application/json')
+
+        data = json.loads(response.data.decode('ascii'))
+        self.assertEqual(data['file']['name'], 'love_song.mp3')
+        self.assertEqual(data['file']['id'], fileA.id)

@@ -3,4 +3,5 @@ env
 tuneful/uploads/*
 *.db
 .idea
-
+.DS_Store
+tmp463cq4hw/
